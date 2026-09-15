@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Contagem Inicial</title>
+<style>
+:root {
+  --bg:#f3f4f6; --card:#fff; --text:#111827; --muted:#6b7280;
+  --primary:#2563eb; --primary-dark:#1d4ed8; --border:#e5e7eb;
+  --danger:#dc2626; --success:#16a34a;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; min-height:100%; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:var(--text); }
+body { padding-bottom:env(safe-area-inset-bottom); }
+.app { max-width:760px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+header {
+  position:sticky; top:0; z-index:10; background:#111827; color:white;
+  padding:16px; box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+h1 { margin:0 0 4px; font-size:21px; }
+.subtitle { color:#d1d5db; font-size:13px; }
+.controls { padding:12px; background:var(--card); border-bottom:1px solid var(--border); }
+.row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+label { display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:#374151; }
+input,select {
+  width:100%; border:1px solid #d1d5db; border-radius:10px; padding:12px;
+  font-size:16px; background:white; color:var(--text); outline:none;
+}
+input:focus,select:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+.search-wrap { position:relative; }
+.search-wrap input { padding-left:40px; }
+.search-icon { position:absolute; left:13px; top:12px; font-size:18px; color:var(--muted); }
+.statusbar { display:flex; justify-content:space-between; gap:10px; margin-top:8px; font-size:12px; color:var(--muted); }
+.list { padding:10px 12px 100px; }
+.product {
+  display:grid; grid-template-columns:minmax(0,1fr) 110px; gap:10px; align-items:center;
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:10px 12px; margin-bottom:8px;
+}
+.name { font-size:15px; line-height:1.25; font-weight:600; word-break:break-word; }
+.qty { text-align:center; font-weight:700; }
+.qty input { text-align:center; padding:10px 6px; font-size:18px; font-weight:700; }
+.hidden { display:none !important; }
+.empty { text-align:center; color:var(--muted); padding:35px 15px; }
+.fab {
+  position:fixed; right:max(18px, env(safe-area-inset-right)); bottom:max(18px, env(safe-area-inset-bottom));
+  width:62px; height:62px; border:0; border-radius:50%; background:var(--primary); color:white;
+  font-size:27px; box-shadow:0 5px 18px rgba(0,0,0,.25); cursor:pointer; z-index:20;
+}
+.fab:disabled { opacity:.5; cursor:default; }
+.overlay {
+  position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.42); display:flex;
+  align-items:center; justify-content:center; padding:20px;
+}
+.dialog {
+  width:min(420px,100%); background:white; border-radius:16px; padding:22px;
+  box-shadow:0 15px 45px rgba(0,0,0,.3); text-align:center;
+}
+.spinner {
+  width:38px; height:38px; margin:0 auto 12px; border:4px solid #dbeafe;
+  border-top-color:var(--primary); border-radius:50%; animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.toast {
+  position:fixed; left:50%; bottom:92px; transform:translateX(-50%);
+  max-width:calc(100% - 30px); background:#111827; color:white; padding:12px 16px;
+  border-radius:10px; font-size:14px; z-index:50; box-shadow:0 5px 20px rgba(0,0,0,.25);
+}
+.toast.success { background:#166534; } .toast.error { background:#991b1b; }
+button.secondary {
+  border:1px solid #d1d5db; background:white; border-radius:10px; padding:10px 14px;
+  font-weight:700; cursor:pointer;
+}
+@media (max-width:560px) {
+  .row { grid-template-columns:1fr; }
+  .product { grid-template-columns:minmax(0,1fr) 96px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <h1>Contagem Inicial</h1>
+  <div class="subtitle">Informe as quantidades dos produtos e envie a contagem.</div>
+</header>
+
+<section class="controls">
+  <div class="row">
+    <div>
+      <label for="loja">Loja</label>
+      <select id="loja">
+        <option value="">Selecione...</option>
+        <option>Terminal 3</option>
+        <option>Forneria Leste</option>
+        <option>Cafe Leste</option>
+        <option>Forneria Oeste</option>
+        <option>Padaria</option>
+        <option>Estoque</option>
+        <option>Exposicao</option>
+      </select>
+    </div>
+    <div>
+      <label for="login">Responsável</label>
+      <input id="login" type="text" autocomplete="username" placeholder="Nome do responsável">
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input id="busca" type="search" inputmode="search" autocomplete="off"
+           placeholder="Buscar produto..." aria-label="Buscar produto">
+  </div>
+
+  <div class="statusbar">
+    <span id="contador">0 produtos</span>
+    <span id="selecionados">0 preenchidos</span>
+  </div>
+</section>
+
+<main id="lista" class="list"></main>
+</div>
+
+<button id="btnEnviar" class="fab" title="Enviar contagem" aria-label="Enviar contagem">➤</button>
+
+<div id="overlay" class="overlay hidden">
+  <div class="dialog">
+    <div class="spinner"></div>
+    <strong id="progressTitle">Enviando...</strong>
+    <div id="progressText" style="margin-top:7px;color:#6b7280;font-size:13px;">
+      Aguarde enquanto os dados são enviados ao Google Forms.
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ============================================================
+// CONFIGURAÇÃO
+// ============================================================
+// Configuração do envio para o Google Forms.
+const CONFIG = {
+  FORM_URL: "https://docs.google.com/forms/d/e/1FAIpQLSd27r7FDuRzXDjxxtJNL67bgPL8eqYtGP6g94yAnuQF6t8a8w/formResponse",
+  FORM_ENTRIES: {
+    produto: "entry.1028941405",
+    quantidade: "entry.667992309",
+    loja: "entry.1248793481",
+    responsavel: "entry.918181913"
+  }
+};
+
+const PRODUTOS_INICIAIS = [
+  "PEPPERONI FAT CERATTI 1KG",
+  "ACEM (MOIDO) 1KG",
+  "ACUCAR 3C CRISTAL SACHE 5G C 400UN",
+  "AGUA COM GAS",
+  "AGUA DE COCO",
+  "AGUA DE COCO - CX C 27UN",
+  "AGUA SEM GAS",
+  "ALCATRA PAILLARD 130G",
+  "ALCATRA PAILLARD 80G",
+  "ALFACE AMERICANA",
+  "ALFACE CRESPA",
+  "ALHO DESCASCADO",
+  "AMERICAN ROLL",
+  "BARRINHA PROTEINA 15G",
+  "BATATA MONALISA LAVADA",
+  "BEBIDA JUNGLE",
+  "BEBIDA LACTEA 3 CORACOES",
+  "BEBIDA VEGETAL CASTANHA",
+  "BIS EXTRA",
+  "BOLO CENOURA",
+  "BOLO SECO",
+  "BRIGADEIRO",
+  "QUINDIM",
+  "CANUDO FLEX SHAKE 8MM SACHE C/100 VERM",
+  "CAPPUCCINO 3C 1KG",
+  "CEBOLA GRAUDA",
+  "CERVEJA CORONA",
+  "CERVEJA EISENBAHN",
+  "CERVEJA ESTRELLA GALICIA",
+  "CERVEJA HEINEKEN",
+  "CERVEJA IPA TERESOPOLIS",
+  "CHA COPO",
+  "CHA MATTE COPO",
+  "CHA TRES QUENTE E GELADO",
+  "CHANTILLY SPRAY POLENGUI 250GR",
+  "CHEEZIT",
+  "CHICLETS",
+  "CIABATA RECHEADA",
+  "CIGARRO MARLBORO",
+  "COBERTURA SORVETE CARAMELO MARVI 1,01KG",
+  "COBERTURA SORVETE CHOCOLATE MARVI 1,01KG",
+  "COCA COLA",
+  "COCA COLA ZERO",
+  "COLHER P/REF. CRISTAL MASTER C/50 8882",
+  "COOKIES",
+  "COPO ALTO 550ML 50UN CX C 20PCT",
+  "COPO P/AGUA 180ML C/100 COPOMAIS",
+  "COPO P/CHOPPS 330ML C/50 ALTACOPPO TR.",
+  "COPO PAP 3C 180ML VIAGEM C 50UN",
+  "COXINHA",
+  "COXINHA C REQUEIJAO",
+  "CREME DE AVELA 3KG NUTELLA",
+  "CROISSANT",
+  "CX 30UN OVOS BRANCOS",
+  "CX LEITE VEGETAL A TAL DA CASTANHA",
+  "CX Molho pimenta sache BOM SABOR 200unx3g",
+  "DELL VALE GARRAFA",
+  "DELLVALE",
+  "DETERGENTE LIMPOL",
+  "DOCE CONFEITARIA",
+  "EMPADAS SABORES",
+  "ENROLADINHO SALSICHA",
+  "ESFIHA CARNE",
+  "ESFIHA FRANGO",
+  "FACA P/ REF. BRANCA MASTER C/50 8845",
+  "FANTA LARANJA",
+  "FANTA UVA",
+  "FARINHA DE TRIGO ANACONDA 1KG",
+  "FARINHA P PIZZA CAPUTO 25KG",
+  "FILE DE ALCATRA A MILANESA",
+  "FILE DE FRANGO A MILANESA",
+  "FILE DE FRANGO PAILLARD 120G",
+  "FILE DE FRANGO PAILLARD 80G",
+  "FRUTELLA",
+  "GARFO P/REF. BRANCA MASTER C/50",
+  "GATORADE",
+  "GOMA DE MASCAR MENTOS",
+  "GUARANA",
+  "GUARANA LEAO",
+  "GUARANA LEAO ACAI",
+  "GUARANA ZERO",
+  "GUARDANAPO SACHE 28X20,5 1000 X 2 PLUMA",
+  "H2O",
+  "HALLS",
+  "HEINEKEN 330ML CX C 24UN",
+  "ICE TEA LEAO",
+  "ISQUEIRO",
+  "KAPPO",
+  "KETCHUP HEINZ CX C/ 144UN",
+  "KITKAT",
+  "LACTA BARRA",
+  "LANCHE NATURAL",
+  "LARANJA IN NATURA 18KG",
+  "LEITE INTEGRAL",
+  "LEITE INTEGRAL ITALAC CX C 12",
+  "Limao tahiti graudo",
+  "LINGUICA CALABRESA DEF AURORA 5KG",
+  "MACARONS",
+  "MAIONESE HEINZ CX C/ 144UN",
+  "MANJERICAO",
+  "MANJERICAO FOLHA PQN",
+  "MANTEIGA BLOCO S/SAL CX 5KG",
+  "MENTOS",
+  "MEXEDOR PLASTICO P/DRINK C/500 LM",
+  "MINI MORANGOBAUNILHA",
+  "MINI OREO",
+  "MISTO QUENTE",
+  "MM",
+  "Molho de pimenta cx c 154un",
+  "MONSTER ENERGETICO",
+  "MOSTARDA HEINZ CX C/ 144UN",
+  "MP BROTO DE BETERRABA",
+  "MP BROTO DE SALSINHA",
+  "MUSSARELA SKALA 5KG",
+  "OLEO DE ALGODAO BALDE 14,5 KG",
+  "OURO BRANCO",
+  "PACOCA",
+  "PACOTE CAFÉ EM PÓ",
+  "PACOTE CAFE EM GRAO",
+  "PACOTE CHOCOLATE",
+  "PCT FARINHA PANKO PENINA 1KG",
+  "PCT FEIJAO CARIOCA CAMIL 1KG",
+  "PCT SAL FINO CISNE 1KG",
+  "PCT TAMPA COPO 500ML 50UN CX C 20PCT",
+  "PECA PRESUNTO AURORA",
+  "PECA PRESUNTO SEARA",
+  "PECA QUEIJO PRATO BRUZZO",
+  "PCT PENNE",
+  "PRESTIGIO",
+  "PREZUNTO COZIDO SADIA",
+  "PRINGLES",
+  "PUDIM",
+  "QUEIJO PARMESAO TIROLEZ",
+  "QUEIJO PRATO TIROLEZ",
+  "REDBULL",
+  "Requeijao bisnaga 1,5Kg",
+  "RUFFLES",
+  "SACO P/ TALHER 08X23",
+  "SALADA DE FRUTAS",
+  "SALSA",
+  "SALSAO",
+  "SCHWEPPES",
+  "SNICKERS",
+  "SONHO DE VALSA",
+  "SONHO DE VALSA 25G",
+  "SPRITE",
+  "TALENTO",
+  "TAMPA COPO PAP 3C 180ML P/ VIAGEM C 100UN",
+  "TODYNHO 220 ML",
+  "TODYNHO CHOCOLATE 200ML CX C 27",
+  "Tomate Carmen",
+  "TOMATE ITALIANO",
+  "TOMATE PELADO LT 2,5KG",
+  "TONICA",
+  "TORCIDA",
+  "TORTA PEDACO",
+  "TRIDENT",
+  "TWIX",
+  "YOOPROWHEY",
+  "ZAYTAS"
+];
+
+const state = {
+  produtos: {},
+  enviando: false,
+  loja: "",
+  login: ""
+};
+
+const $ = id => document.getElementById(id);
+
+function removerAcentos(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function chaveBusca(texto) {
+  return removerAcentos(texto).toLowerCase().trim();
+}
+
+function escapeHtml(texto) {
+  return String(texto ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+  })[c]);
+}
+
+function toast(msg, tipo="") {
+  const el = $("toast");
+  el.textContent = msg;
+  el.className = "toast " + tipo;
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => el.classList.add("hidden"), 4200);
+}
+
+function mostrarOverlay(titulo, texto) {
+  $("progressTitle").textContent = titulo;
+  $("progressText").textContent = texto;
+  $("overlay").classList.remove("hidden");
+}
+
+function esconderOverlay() {
+  $("overlay").classList.add("hidden");
+}
+
+function inicializarProdutos() {
+  state.produtos = {};
+  for (const nome of PRODUTOS_INICIAIS) state.produtos[nome] = "";
+  render();
+}
+
+function render() {
+  const termo = chaveBusca($("busca").value);
+  const nomes = Object.keys(state.produtos).filter(nome =>
+    chaveBusca(nome).includes(termo)
+  );
+
+  const lista = $("lista");
+  lista.innerHTML = "";
+
+  if (!nomes.length) {
+    lista.innerHTML = '<div class="empty">Nenhum produto encontrado.</div>';
+  } else {
+    const frag = document.createDocumentFragment();
+    for (const nome of nomes) {
+      const item = document.createElement("div");
+      item.className = "product";
+      item.innerHTML = `
+        <div class="name">${escapeHtml(nome)}</div>
+        <div class="qty">
+          <input type="number" min="0" step="1" inputmode="numeric"
+                 aria-label="Quantidade de ${escapeHtml(nome)}"
+                 data-produto="${escapeHtml(nome)}"
+                 value="${escapeHtml(state.produtos[nome])}">
+        </div>`;
+      frag.appendChild(item);
+    }
+    lista.appendChild(frag);
+
+    lista.querySelectorAll("input[data-produto]").forEach(input => {
+      input.addEventListener("input", () => {
+        const nome = input.dataset.produto;
+        // Mantém somente números inteiros não negativos.
+        input.value = input.value.replace(/[^0-9]/g, "");
+        state.produtos[nome] = input.value;
+        atualizarContadores();
+      });
+    });
+  }
+
+  $("contador").textContent = `${nomes.length} produto${nomes.length === 1 ? "" : "s"}`;
+  atualizarContadores();
+}
+
+function atualizarContadores() {
+  const n = Object.values(state.produtos)
+    .filter(v => String(v).trim() !== "").length;
+  $("selecionados").textContent = `${n} preenchido${n === 1 ? "" : "s"}`;
+}
+
+function salvarDadosLocais() {
+  localStorage.setItem("contagem_loja", $("loja").value);
+  localStorage.setItem("contagem_login", $("login").value);
+}
+
+function carregarDadosLocais() {
+  const params = new URLSearchParams(location.search);
+  const loja = params.get("nomeLoja") || localStorage.getItem("contagem_loja") || "";
+  const login = params.get("login") || localStorage.getItem("contagem_login") || "";
+  $("loja").value = loja;
+  $("login").value = login;
+}
+
+function validar() {
+  if (!$("loja").value.trim()) {
+    toast("Selecione a loja antes de enviar.", "error");
+    $("loja").focus();
+    return false;
+  }
+  if (!$("login").value.trim()) {
+    toast("Informe o responsável.", "error");
+    $("login").focus();
+    return false;
+  }
+  const temQuantidade = Object.values(state.produtos)
+    .some(v => String(v).trim() !== "");
+  if (!temQuantidade) {
+    toast("Informe pelo menos uma quantidade.", "error");
+    return false;
+  }
+  return true;
+}
+
+async function enviarSomenteForms(produto, quantidade) {
+  const dados = new URLSearchParams();
+  dados.set(CONFIG.FORM_ENTRIES.produto, produto);
+  dados.set(CONFIG.FORM_ENTRIES.quantidade, quantidade);
+  dados.set(CONFIG.FORM_ENTRIES.loja, state.loja);
+  dados.set(CONFIG.FORM_ENTRIES.responsavel, state.login);
+
+  // Google Forms normalmente não libera leitura da resposta via CORS.
+  // no-cors permite o POST sem tentar ler a resposta.
+  await fetch(CONFIG.FORM_URL, {
+    method: "POST",
+    mode: "no-cors",
+    body: dados,
+    keepalive: true
+  });
+}
+
+async function enviarRespostas() {
+  if (state.enviando || !validar()) return;
+
+  state.enviando = true;
+  $("btnEnviar").disabled = true;
+  state.loja = $("loja").value.trim();
+  state.login = $("login").value.trim();
+  salvarDadosLocais();
+
+  const itens = Object.entries(state.produtos)
+    .filter(([_, quantidade]) => String(quantidade).trim() !== "");
+
+  mostrarOverlay("Enviando contagem...", `0 de ${itens.length} itens enviados.`);
+
+  try {
+    let enviados = 0;
+
+    // Equivalente ao envio paralelo do ExecutorService.
+    const lote = 4;
+    for (let i = 0; i < itens.length; i += lote) {
+      const grupo = itens.slice(i, i + lote);
+      await Promise.all(grupo.map(([produto, quantidade]) =>
+        enviarSomenteForms(produto, quantidade)
+      ));
+      enviados += grupo.length;
+      $("progressText").textContent = `${enviados} de ${itens.length} itens enviados.`;
+    }
+
+    esconderOverlay();
+    toast("Itens enviados com sucesso!", "success");
+
+    // Limpa quantidades após envio bem-sucedido.
+    for (const nome of Object.keys(state.produtos)) state.produtos[nome] = "";
+    render();
+
+  } catch (erro) {
+    esconderOverlay();
+    console.error(erro);
+    toast("Erro ao enviar: " + (erro.message || erro), "error");
+  } finally {
+    state.enviando = false;
+    $("btnEnviar").disabled = false;
+  }
+}
+
+$("busca").addEventListener("input", render);
+$("loja").addEventListener("change", salvarDadosLocais);
+$("login").addEventListener("input", salvarDadosLocais);
+$("btnEnviar").addEventListener("click", enviarRespostas);
+
+carregarDadosLocais();
+inicializarProdutos();
+</script>
+</body>
+</html>
