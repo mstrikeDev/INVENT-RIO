@@ -109,6 +109,15 @@ button.secondary {
     </div>
   </div>
 
+  <div style="margin-bottom:10px;">
+    <label for="tipoContagem">Tipo de contagem</label>
+    <select id="tipoContagem">
+      <option value="">Selecione...</option>
+      <option value="Abastecidos">Abastecidos</option>
+      <option value="Fechado">Fechado</option>
+    </select>
+  </div>
+
   <div class="search-wrap">
     <span class="search-icon">⌕</span>
     <input id="busca" type="search" inputmode="search" autocomplete="off"
@@ -149,7 +158,8 @@ const CONFIG = {
     produto: "entry.1028941405",
     quantidade: "entry.667992309",
     loja: "entry.1248793481",
-    responsavel: "entry.918181913"
+    responsavel: "entry.918181913",
+    tipoContagem: "entry.1145309636"
   }
 };
 
@@ -330,7 +340,8 @@ const state = {
   produtos: {},
   enviando: false,
   loja: "",
-  login: ""
+  login: "",
+  tipoContagem: ""
 };
 
 const $ = id => document.getElementById(id);
@@ -443,6 +454,11 @@ function validar() {
     $("loja").focus();
     return false;
   }
+  if (!$("tipoContagem").value.trim()) {
+    toast("Selecione o tipo de contagem.", "error");
+    $("tipoContagem").focus();
+    return false;
+  }
   if (!$("login").value.trim()) {
     toast("Informe o responsável.", "error");
     $("login").focus();
@@ -463,6 +479,7 @@ async function enviarSomenteForms(produto, quantidade) {
   dados.set(CONFIG.FORM_ENTRIES.quantidade, quantidade);
   dados.set(CONFIG.FORM_ENTRIES.loja, state.loja);
   dados.set(CONFIG.FORM_ENTRIES.responsavel, state.login);
+  dados.set(CONFIG.FORM_ENTRIES.tipoContagem, state.tipoContagem);
 
   // Google Forms normalmente não libera leitura da resposta via CORS.
   // no-cors permite o POST sem tentar ler a resposta.
@@ -481,6 +498,7 @@ async function enviarRespostas() {
   $("btnEnviar").disabled = true;
   state.loja = $("loja").value.trim();
   state.login = $("login").value.trim();
+  state.tipoContagem = $("tipoContagem").value;
   salvarDadosLocais();
 
   const itens = Object.entries(state.produtos)
@@ -505,8 +523,17 @@ async function enviarRespostas() {
     esconderOverlay();
     toast("Itens enviados com sucesso!", "success");
 
-    // Limpa quantidades após envio bem-sucedido.
+    // Limpa todos os campos após envio bem-sucedido.
     for (const nome of Object.keys(state.produtos)) state.produtos[nome] = "";
+    $("loja").value = "";
+    $("login").value = "";
+    $("tipoContagem").value = "";
+    $("busca").value = "";
+    state.loja = "";
+    state.login = "";
+    state.tipoContagem = "";
+    localStorage.removeItem("contagem_loja");
+    localStorage.removeItem("contagem_login");
     render();
 
   } catch (erro) {
